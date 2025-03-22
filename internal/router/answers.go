@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strconv"
 
@@ -178,7 +177,6 @@ func (r *router) doDeleteFolder(ctx context.Context, b *bot.Bot, event *entities
 }
 
 func sendMessage(event *entities.Event, message string) *entities.Answer {
-	fmt.Println(message)
 	return entities.NewAnswer(event, true, &entities.AnswerParams{Message: message})
 }
 

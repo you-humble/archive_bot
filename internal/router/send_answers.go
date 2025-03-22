@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"fmt"
 
 	"archive_bot/internal/entities"
 
@@ -68,7 +67,6 @@ func (r *router) sendAnswers(ctx context.Context, b *bot.Bot, answers []*entitie
 			r.checkIfMessageDeleteAfter(ans, msg.ID)
 		}
 		if ans.EditMessageText != nil {
-			fmt.Println("EditMessageText", ans.EditMessageText)
 			msg, err := b.EditMessageText(ctx, ans.EditMessageText)
 			checkErrAnswer("EditMessageText", log, err)
 			r.checkIfMessageDeleteAfter(ans, msg.ID)

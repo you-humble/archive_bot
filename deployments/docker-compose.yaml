@@ -45,7 +45,7 @@ services:
       - ${NGINX_HTTPS_PORT}:443
     restart: always
     environment:
-      - NGINX_HOST: ${NGINX_HOST}
+      - NGINX_HOST=${NGINX_HOST}
     volumes:
       # - ./nginx/first_start/:/etc/nginx/templates/:ro
       - ./nginx/templates/:/etc/nginx/templates/:ro
