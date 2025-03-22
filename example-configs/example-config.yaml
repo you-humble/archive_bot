@@ -1,0 +1,14 @@
+log_level: info
+is_webhook: 1
+postgres_url: postgres://user:secret_password@database:2345/example_db
+redis:
+  address: redis:1234
+  password: secret_password
+  user: user
+  db: 16
+  max_retries: 10
+bot:
+  token: "YOUR_SECRET_TOKEN"
+  webhook_url: "https://example.com"
+  webhook_secret_token: ""
+  port: "5000"
