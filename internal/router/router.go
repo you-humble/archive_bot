@@ -18,6 +18,7 @@ import (
 
 const (
 	start             string = "/start"
+	info              string = "/info"
 	folders           string = "/folders"
 	moveLastNote      string = "/move_note"
 	moveLastNoteAlias string = "!"
@@ -93,12 +94,19 @@ func (r *router) RouteMessage(ctx context.Context, b *bot.Bot, update *models.Up
 		event.Text = text
 	}
 
+	if event.Type == entities.Unknown {
+		go r.doUnknown(ctx, b, event)
+		return
+	}
+
 	log.Debug("switch Message", logger.String("command", command))
 	switch command {
 	case "":
 		go r.doEmpty(ctx, b, event)
 	case start:
 		go r.doStart(ctx, b, event)
+	case info:
+		go r.doInfo(ctx, b, event)
 	case folders:
 		go r.doShowFolders(ctx, b, event)
 	case moveLastNote:
@@ -271,21 +279,26 @@ func ParseButtonCallback(command string) (int, int, string) {
 }
 
 func (r *router) deleteMessages(ctx context.Context, b *bot.Bot, event *entities.Event) {
-	_, err := b.DeleteMessages(ctx, &bot.DeleteMessagesParams{
-		ChatID:     event.Meta.ChatID,
-		MessageIDs: r.process.MessageIDs(event.Meta.UserID),
-	})
-	if err != nil {
-		r.log.Error("", logger.ErrAttr(err))
+	msgIDs := r.process.MessageIDs(event.Meta.UserID)
+	if len(msgIDs) > 0 {
+		_, err := b.DeleteMessages(ctx, &bot.DeleteMessagesParams{
+			ChatID:     event.Meta.ChatID,
+			MessageIDs: msgIDs,
+		})
+		if err != nil {
+			r.log.Error("", logger.ErrAttr(err))
+		}
 	}
 }
 
 func (r *router) deleteMessage(ctx context.Context, b *bot.Bot, event *entities.Event) {
-	_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
-		ChatID:    event.Meta.ChatID,
-		MessageID: event.Meta.MessageID,
-	})
-	if err != nil {
-		r.log.Error("", logger.ErrAttr(err))
+	if event.Meta.MessageID != 0 {
+		_, err := b.DeleteMessage(ctx, &bot.DeleteMessageParams{
+			ChatID:    event.Meta.ChatID,
+			MessageID: event.Meta.MessageID,
+		})
+		if err != nil {
+			r.log.Error("", logger.ErrAttr(err))
+		}
 	}
 }

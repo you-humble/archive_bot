@@ -143,7 +143,7 @@ func (repo *pgRepository) FindLast(ctx context.Context, userID int64) (*TextNote
 		ORDER BY created_at DESC 
 		LIMIT 1;`,
 		userID).Scan(&note.Description, &note.CreatedAt); err != nil {
-		return nil, er.New("the note could not be removed", op, err)
+		return nil, er.New("the last note could not be find", op, err)
 	}
 
 	return &note, nil

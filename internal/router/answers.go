@@ -11,6 +11,7 @@ import (
 	"archive_bot/pkg/logger"
 
 	"github.com/go-telegram/bot"
+	"github.com/go-telegram/bot/models"
 )
 
 func (r *router) doDefaultCallback(ctx context.Context, b *bot.Bot, event *entities.Event) {
@@ -22,9 +23,10 @@ func (r *router) doDefaultCallback(ctx context.Context, b *bot.Bot, event *entit
 			r.deleteMessages(ctx, b, event)
 			if message != messages.WrongFolder {
 				r.sendAnswers(ctx, b, []*entities.Answer{sendFoldersList(event, btns, false)})
-				r.process.SetInt(isFolderSetKey(event), 0)
+				r.process.SetInt(isFolderSetKey(event), 1)
 			} else {
-				sendMessage(event, message)
+				event.IsEdited = false
+				r.sendAnswers(ctx, b, []*entities.Answer{sendMessage(event, message)})
 			}
 		}()
 		return
@@ -46,36 +48,6 @@ func (r *router) doDefaultCallback(ctx context.Context, b *bot.Bot, event *entit
 	}()
 }
 
-func checkDefaultFolder(event *entities.Event, folderName string) *entities.Answer {
-	if folderName != "default" {
-		return sendFoldersButton(event, "📁"+folderName, buttons.Folders, true)
-	}
-	return sendFoldersButton(event, "📁"+buttons.DefaultFolderName, buttons.Folders, true)
-}
-
-func collectNotes(
-	answers []*entities.Answer,
-	event *entities.Event,
-	notes map[int]*entities.AnswerParams,
-) []*entities.Answer {
-	if len(notes) == 0 {
-		return append(answers, sendMessage(event, messages.NotesIsEmpty))
-	}
-	notesIDs := make([]int, 0, len(notes))
-	for id := range notes {
-		notesIDs = append(notesIDs, id)
-	}
-	sort.Ints(notesIDs)
-
-	for _, noteID := range notesIDs {
-		answers = append(answers, sendNote(
-			event, noteID, event.FolderID, true, notes[noteID],
-		))
-	}
-
-	return answers
-}
-
 func (r *router) doEmpty(ctx context.Context, b *bot.Bot, event *entities.Event) {
 	if message := r.process.AddFolderEnd(ctx, event); message != "" {
 		btns := r.process.Folders(ctx, event)
@@ -83,11 +55,10 @@ func (r *router) doEmpty(ctx context.Context, b *bot.Bot, event *entities.Event)
 		go func() {
 			r.deleteMessages(ctx, b, event)
 			r.sendAnswers(ctx, b, []*entities.Answer{sendFoldersList(event, btns, false)})
-			r.process.SetInt(isFolderSetKey(event), 0)
+			r.process.SetInt(isFolderSetKey(event), 1)
 		}()
 		return
 	}
-
 	ap := r.process.Save(ctx, event)
 	go func() {
 		if ap.Message != "" {
@@ -100,9 +71,11 @@ func (r *router) doEmpty(ctx context.Context, b *bot.Bot, event *entities.Event)
 
 func (r *router) doStart(ctx context.Context, b *bot.Bot, event *entities.Event) {
 	message, btn := r.process.Start(ctx, event)
+	event.Meta.MessageID = r.process.FolderMsgID(event.Meta.UserID)
 	go func() {
 		r.deleteMessages(ctx, b, event)
-		r.process.SetInt(isFolderSetKey(event), 1)
+		r.deleteMessage(ctx, b, event)
+		r.process.SetInt(isFolderSetKey(event), 0)
 		r.sendAnswers(ctx, b, []*entities.Answer{sendFoldersButton(event, message, btn, true)})
 	}()
 }
@@ -112,9 +85,9 @@ func (r *router) doShowFolders(ctx context.Context, b *bot.Bot, event *entities.
 	isFolderSet := r.process.Int("isFolderSet:" + strconv.FormatInt(event.Meta.UserID, 10))
 	go func() {
 		r.deleteMessages(ctx, b, event)
-		if isFolderSet != 0 {
+		if isFolderSet == 0 {
 			r.sendAnswers(ctx, b, []*entities.Answer{sendFoldersList(event, btns, false)})
-			r.process.SetInt(isFolderSetKey(event), 0)
+			r.process.SetInt(isFolderSetKey(event), 1)
 		}
 	}()
 }
@@ -131,10 +104,10 @@ func (r *router) doSaveTo(ctx context.Context, b *bot.Bot, event *entities.Event
 		)
 		go func() {
 			r.deleteMessages(ctx, b, event)
-			r.deleteMessage(ctx, b, event)
 			r.sendAnswers(ctx, b, []*entities.Answer{sendMessage(event, message)})
+			event.IsEdited = true
 			r.sendAnswers(ctx, b, []*entities.Answer{sendFoldersList(event, btns, false)})
-			r.process.SetInt(isFolderSetKey(event), 0)
+			r.process.SetInt(isFolderSetKey(event), 1)
 		}()
 	}
 }
@@ -182,4 +155,56 @@ func sendMessage(event *entities.Event, message string) *entities.Answer {
 
 func isFolderSetKey(event *entities.Event) string {
 	return "isFolderSet:" + strconv.FormatInt(event.Meta.UserID, 10)
+}
+
+func (r *router) doInfo(ctx context.Context, b *bot.Bot, event *entities.Event) {
+	videos := make([]*entities.Answer, 0, len(messages.InfoMap))
+	for videoID, caption := range messages.InfoMap {
+		ans := entities.Answer{UserID: event.Meta.UserID, DeleteAfter: true}
+		ans.SendVideo = &bot.SendVideoParams{
+			ChatID:  event.Meta.ChatID,
+			Video:   &models.InputFileString{Data: videoID},
+			Caption: caption,
+		}
+		videos = append(videos, &ans)
+	}
+
+	sort.Slice(videos, func(i, j int) bool {
+		return videos[i].SendVideo.Caption < videos[j].SendVideo.Caption
+	})
+
+	go func() {
+		r.deleteMessage(ctx, b, event)
+		r.sendAnswers(ctx, b, videos)
+	}()
+}
+
+func checkDefaultFolder(event *entities.Event, folderName string) *entities.Answer {
+	if folderName != "default" {
+		return sendFoldersButton(event, "📁"+folderName, buttons.Folders, true)
+	}
+	return sendFoldersButton(event, "📁"+buttons.DefaultFolderName, buttons.Folders, true)
+}
+
+func collectNotes(
+	answers []*entities.Answer,
+	event *entities.Event,
+	notes map[int]*entities.AnswerParams,
+) []*entities.Answer {
+	if len(notes) == 0 {
+		return append(answers, sendMessage(event, messages.NotesIsEmpty))
+	}
+	notesIDs := make([]int, 0, len(notes))
+	for id := range notes {
+		notesIDs = append(notesIDs, id)
+	}
+	sort.Ints(notesIDs)
+
+	for _, noteID := range notesIDs {
+		answers = append(answers, sendNote(
+			event, noteID, event.FolderID, true, notes[noteID],
+		))
+	}
+
+	return answers
 }

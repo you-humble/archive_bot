@@ -60,6 +60,10 @@ func NewEvent(ctx context.Context, update *models.Update) *Event {
 		return event
 	}
 
+	if update.Message == nil {
+		return event
+	}
+
 	switch eventType {
 	case Message:
 		event.Text = checkForwardOrigin(update, event)
@@ -157,6 +161,11 @@ func fetchType(update *models.Update, event *Event) Type {
 			return Message
 		}
 	}
+
+	if update.Message == nil {
+		return Unknown
+	}
+
 	switch {
 	case len(update.Message.Photo) != 0:
 		return Photo
