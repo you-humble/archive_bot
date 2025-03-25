@@ -22,11 +22,11 @@ type Repository interface {
 type service struct {
 	log             *logger.Logger
 	repo            Repository
-	defaultFolderID int
+	defaultFolderID map[int64]int
 }
 
 func NewService(ctx context.Context, log *logger.Logger, repo Repository) *service {
-	return &service{log: log, repo: repo}
+	return &service{log: log, repo: repo, defaultFolderID: make(map[int64]int)}
 }
 
 func (s *service) Save(ctx context.Context, event *entities.Event) string {
@@ -69,19 +69,20 @@ func (s *service) SaveDefault(ctx context.Context, event *entities.Event) error 
 		return err
 	}
 
-	s.defaultFolderID = int(FolderID)
+	s.defaultFolderID[event.Meta.UserID] = FolderID
 	return nil
 }
 
 func (s *service) DefaultFolderID(ctx context.Context, user_id int64) int {
-	if s.defaultFolderID == 0 {
-		id, err := s.repo.DefaultFolderID(ctx, user_id)
+	defaultFolderID, ok := s.defaultFolderID[user_id]
+	if !ok {
+		defaultFolderID, err := s.repo.DefaultFolderID(ctx, user_id)
 		if err != nil {
 			return 0
 		}
-		s.defaultFolderID = id
+		s.defaultFolderID[user_id] = defaultFolderID
 	}
-	return s.defaultFolderID
+	return defaultFolderID
 }
 
 func (s *service) All(ctx context.Context, event *entities.Event) map[string]string {

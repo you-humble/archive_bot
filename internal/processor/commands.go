@@ -12,6 +12,14 @@ import (
 )
 
 func (p *processor) Start(ctx context.Context, event *entities.Event) (string, string) {
+	log := p.log.With(logger.String("operation", "processor.Start"))
+
+	if p.fm.service.DefaultFolderID(ctx, event.Meta.UserID) == 0 {
+		if err := p.fm.service.SaveDefault(ctx, event); err != nil {
+			log.Error("save default folder error", logger.ErrAttr(err))
+		}
+	}
+
 	return messages.StartCommand, buttons.Folders
 }
 
